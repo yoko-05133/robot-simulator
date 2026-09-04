@@ -27,11 +27,52 @@ jobs:
         uses: actions/configure-pages@v5
         with:
           enablement: true
-      - name: Prepare exact simulator site
+      - name: Prepare site
         run: |
           set -e
           mkdir -p _site
-          curl -fsSL https://raw.githubusercontent.com/yoko-05133/robot-simulator/b5780e2227b37a9d289ac589b398530716501765/index.html -o _site/index.html
+          cp index.html _site/index.html
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('_site/index.html')
+          s=p.read_text(encoding='utf-8')
+          css='''<style>
+          .section-title{font-size:15px;font-weight:700;padding:0 0 14px;color:var(--text);}
+          .map-section > .panel{margin-bottom:16px;}
+          .reordered-panel{padding:18px;}
+          </style>'''
+          js='''<script>
+          (function(){
+            const wrap=document.querySelector('.wrap');
+            if(!wrap)return;
+            const panels=Array.from(wrap.querySelectorAll(':scope > .panel'));
+            const controlPanel=panels.find(p=>p.querySelector('#targetX'));
+            const canvasPanel=panels.find(p=>p.querySelector('#stage'));
+            const detail=panels.find(p=>p.querySelector('#paramGrid')&&p.querySelector('#arduinoArea'));
+            if(!controlPanel||!canvasPanel||!detail)return;
+            const body=detail.querySelector('.details-body');
+            const paramGrid=document.getElementById('paramGrid');
+            const paramActions=paramGrid?.nextElementSibling;
+            const saved=document.getElementById('savedPanel');
+            const arduino=document.querySelector('.arduino-converter');
+            const code=document.getElementById('codeArea');
+            const codeLabel=code?.previousElementSibling;
+            const codeActions=code?.nextElementSibling;
+            const hint=codeActions?.nextElementSibling;
+            const logLabel=hint?.nextElementSibling;
+            const log=document.getElementById('logPanel');
+            const panel=(title)=>{const p=document.createElement('div');p.className='panel reordered-panel';const h=document.createElement('div');h.className='section-title';h.textContent=title;p.appendChild(h);return p;};
+            const map=document.createElement('div');map.id='mapSection';map.className='map-section';wrap.insertBefore(map,controlPanel);map.append(controlPanel,canvasPanel);
+            const vars=panel('変数');vars.id='variablesSection';if(paramGrid)vars.appendChild(paramGrid);if(paramActions)vars.appendChild(paramActions);if(saved)vars.appendChild(saved);wrap.insertBefore(vars,detail);
+            const ard=panel('Arduinoコード');ard.id='arduinoSection';if(arduino)ard.appendChild(arduino);wrap.insertBefore(ard,detail);
+            const jspan=panel('JavaScriptコード');jspan.id='javascriptSection';[codeLabel,code,codeActions,hint,logLabel,log].forEach(e=>{if(e)jspan.appendChild(e);});wrap.insertBefore(jspan,detail);
+            detail.remove();
+          })();
+          </script>'''
+          s=s.replace('</head>',css+'</head>',1)
+          s=s.replace('</body>',js+'</body>',1)
+          p.write_text(s,encoding='utf-8')
+          PY
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
