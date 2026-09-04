@@ -1,0 +1,1608 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ロボット走行シミュレーター</title>
+<style>
+  :root{
+    --bg:#0E1116;
+    --panel:#161A21;
+    --panel-2:#1C212A;
+    --line:#2A303B;
+    --line-soft:#232833;
+    --text:#E7EAEE;
+    --text-dim:#8A93A3;
+    --text-dimmer:#5C6577;
+    --amber:#F2A93B;
+    --amber-dim:#8A6A31;
+    --cyan:#4FC9D8;
+    --green:#4ADE80;
+    --red:#EF6B6B;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:980px;margin:0 auto;padding:28px 20px 60px;}
+
+  header{margin-bottom:22px;}
+  header .eyebrow{
+    font-family:ui-monospace,SFMono-Regular,Consolas,'Liberation Mono',monospace;
+    font-size:12px;
+    color:var(--amber);
+    letter-spacing:.02em;
+    margin-bottom:6px;
+  }
+  header h1{
+    font-size:22px;
+    font-weight:700;
+    margin:0 0 6px;
+  }
+  header p{
+    font-size:13.5px;
+    color:var(--text-dim);
+    margin:0;
+    line-height:1.6;
+    max-width:640px;
+  }
+
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:18px;
+    margin-bottom:16px;
+  }
+
+  .controls{
+    display:flex;
+    flex-wrap:wrap;
+    gap:12px 14px;
+    align-items:flex-end;
+  }
+  .field{display:flex;flex-direction:column;gap:6px;}
+  .field label{
+    font-size:11.5px;
+    color:var(--text-dim);
+  }
+  .field input[type=number], .field select{
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    color:var(--text);
+    border-radius:7px;
+    padding:8px 10px;
+    font-family:ui-monospace,SFMono-Regular,Consolas,'Liberation Mono',monospace;
+    font-size:13px;
+    width:110px;
+  }
+  .field input[type=number]:focus, .field select:focus, textarea:focus{
+    outline:none;
+    border-color:var(--amber-dim);
+  }
+  button{
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    color:var(--text);
+    border-radius:7px;
+    padding:9px 14px;
+    font-family:'Inter',sans-serif;
+    font-size:13px;
+    font-weight:600;
+    cursor:pointer;
+    transition:border-color .15s, background .15s;
+    height:37px;
+  }
+  button:hover{border-color:var(--amber-dim);}
+  button.primary{
+    background:var(--amber);
+    border-color:var(--amber);
+    color:#1A1200;
+  }
+  button.primary:hover{background:#ffb84f;}
+  button.danger{color:var(--red);}
+  button:disabled{opacity:.4;cursor:not-allowed;}
+
+  .slider-field{display:flex;flex-direction:column;gap:6px;min-width:220px;flex:1;}
+  .slider-field .row{display:flex;justify-content:space-between;align-items:baseline;}
+  .slider-field .row span:last-child{
+    font-family:ui-monospace,SFMono-Regular,Consolas,'Liberation Mono',monospace;
+    color:var(--amber);
+    font-size:12.5px;
+  }
+  input[type=range]{
+    -webkit-appearance:none;
+    width:100%;
+    height:2px;
+    background:var(--line);
+    border-radius:2px;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:14px;height:14px;border-radius:50%;
+    background:var(--amber);
+    cursor:pointer;
+    border:2px solid #0E1116;
+  }
+
+  .canvas-panel{padding:0;overflow:hidden;}
+  canvas{display:block;width:100%;height:420px;background:
+    linear-gradient(var(--panel) , var(--panel));
+    cursor:grab;
+    touch-action:none;
+  }
+
+  .status-grid{
+    display:grid;
+    grid-template-columns:repeat(6,1fr);
+    gap:0;
+    border-top:1px solid var(--line);
+  }
+  .status-cell{
+    padding:14px 16px;
+    border-right:1px solid var(--line);
+  }
+  .status-cell:last-child{border-right:none;}
+  .status-cell .k{
+    font-size:11px;
+    color:var(--text-dim);
+    margin-bottom:6px;
+  }
+  .status-cell .v{
+    font-family:ui-monospace,SFMono-Regular,Consolas,'Liberation Mono',monospace;
+    font-size:16px;
+    font-weight:500;
+  }
+  .status-cell .v.state-idle{color:var(--text-dim);}
+  .status-cell .v.state-run{color:var(--cyan);}
+  .status-cell .v.state-done{color:var(--green);}
+
+  details{margin-top:4px;}
+  summary{
+    cursor:pointer;
+    font-size:13.5px;
+    font-weight:600;
+    padding:14px 18px;
+    list-style:none;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    color:var(--text);
+  }
+  summary::-webkit-details-marker{display:none;}
+  summary .chev{
+    display:inline-block;
+    transition:transform .15s;
+    color:var(--text-dim);
+    font-size:11px;
+  }
+  details[open] summary .chev{transform:rotate(90deg);}
+  .details-body{padding:0 18px 18px;}
+
+  .param-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(150px,1fr));
+    gap:10px 12px;
+    margin-bottom:16px;
+  }
+  .param-grid .field input{width:100%;}
+
+  textarea{
+    width:100%;
+    min-height:420px;
+    background:#0B0D11;
+    color:#D7DDE6;
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:14px;
+    font-family:ui-monospace,SFMono-Regular,Consolas,'Liberation Mono',monospace;
+    font-size:12.5px;
+    line-height:1.6;
+    resize:vertical;
+    tab-size:2;
+  }
+  .code-actions{
+    display:flex;
+    gap:10px;
+    margin-top:10px;
+    align-items:center;
+  }
+  .code-error{
+    font-family:ui-monospace,SFMono-Regular,Consolas,'Liberation Mono',monospace;
+    font-size:12px;
+    color:var(--red);
+    margin-left:4px;
+  }
+  .code-ok{
+    font-family:ui-monospace,SFMono-Regular,Consolas,'Liberation Mono',monospace;
+    font-size:12px;
+    color:var(--green);
+  }
+
+  .log-panel{
+    height:120px;
+    overflow-y:auto;
+    background:#0B0D11;
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:10px 12px;
+    font-family:ui-monospace,SFMono-Regular,Consolas,'Liberation Mono',monospace;
+    font-size:11.5px;
+    color:var(--text-dim);
+  }
+  .log-panel div{padding:2px 0;}
+  .log-panel .t{color:var(--text-dimmer);margin-right:8px;}
+
+  .hint{
+    font-size:12px;
+    color:var(--text-dimmer);
+    margin-top:10px;
+    line-height:1.6;
+  }
+  .hint code{
+    background:var(--panel-2);
+    padding:1px 5px;
+    border-radius:4px;
+    font-family:ui-monospace,SFMono-Regular,Consolas,'Liberation Mono',monospace;
+    color:var(--cyan);
+  }
+
+  @media (max-width:640px){
+    .status-grid{grid-template-columns:repeat(3,1fr);}
+    .status-cell:nth-child(3){border-right:none;}
+  }
+
+  .arduino-converter{
+    margin-bottom:18px;
+    padding-bottom:18px;
+    border-bottom:1px solid var(--line);
+  }
+  .arduino-converter textarea{
+    min-height:300px;
+    margin-top:8px;
+  }
+  .convert-row{
+    display:flex;
+    gap:10px;
+    align-items:center;
+    flex-wrap:wrap;
+    margin-top:10px;
+  }
+  .convert-msg{
+    font-family:ui-monospace,SFMono-Regular,Consolas,'Liberation Mono',monospace;
+    font-size:12px;
+  }
+  .convert-msg.ok{color:var(--green);}
+  .convert-msg.err{color:var(--red);}
+  .convert-msg.info{color:var(--text-dim);}
+  .source-badge{
+    display:inline-block;
+    font-family:ui-monospace,SFMono-Regular,Consolas,'Liberation Mono',monospace;
+    font-size:10px;
+    padding:2px 6px;
+    border:1px solid var(--line);
+    border-radius:4px;
+    color:var(--cyan);
+    margin-left:6px;
+  }
+
+  .saved-panel{border-top:1px solid var(--line);padding:12px 16px 14px;background:var(--panel);min-height:58px;}
+  .saved-head{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--text-dim);margin-bottom:9px;}
+  .saved-head span:last-child{font-family:ui-monospace,SFMono-Regular,Consolas,'Liberation Mono',monospace;color:var(--text-dimmer);}
+  .saved-vars{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));grid-auto-rows:1fr;align-items:stretch;gap:10px 12px;}
+  .saved-var{min-height:92px;font-family:ui-monospace,SFMono-Regular,Consolas,'Liberation Mono',monospace;font-size:11px;padding:10px 11px;border:1px solid var(--line);border-radius:7px;background:var(--panel-2);color:var(--text);display:flex;flex-direction:column;gap:4px;min-width:0;}
+  .saved-var .saved-jp{color:var(--text);line-height:1.35;}
+  .saved-var .saved-code{color:var(--cyan);font-size:10.5px;}
+  .saved-var .saved-value{font-weight:500;color:var(--text);text-align:left;white-space:nowrap;font-size:13px;margin-top:2px;}
+  .saved-section-title{grid-column:1 / -1;font-size:11px;color:var(--text-dim);padding:8px 0 2px;margin-top:4px;border-top:1px solid var(--line-soft);}
+  .saved-empty{font-size:11px;color:var(--text-dimmer);grid-column:1 / -1;}
+  .param-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));grid-auto-rows:1fr;align-items:stretch;gap:12px;margin-bottom:16px;}
+  .param-grid .field{display:flex;flex-direction:column;align-items:stretch;gap:4px;padding:10px 11px;border:1px solid var(--line);border-radius:7px;background:var(--panel-2);min-width:0;min-height:92px;}
+  .param-grid .field label{margin:0;line-height:1.35;}
+  .param-grid .field .param-code{font-family:ui-monospace,SFMono-Regular,Consolas,'Liberation Mono',monospace;font-size:10.5px;color:var(--cyan);line-height:1.3;}
+  .param-grid .field input{width:100%;margin-top:3px;}
+  @media (max-width: 900px){
+    .param-grid,.saved-vars{grid-template-columns:repeat(3,minmax(0,1fr));}
+  }
+  @media (max-width: 640px){
+    .param-grid,.saved-vars{grid-template-columns:repeat(2,minmax(0,1fr));}
+  }
+  @media (max-width: 480px){
+    .param-grid,.saved-vars{grid-template-columns:1fr;}
+  }
+  canvas{touch-action:none;cursor:grab;}
+
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">ROBOT NAV SIM</div>
+    <h1>ロボット走行シミュレーター</h1>
+    <p>Arduinoコードを貼り付けるとシミュレーター用に自動変換します。マップはドラッグで移動、ホイールでズームできます。「マップリセット」でマップ位置と縮尺を初期調整に戻します。</p>
+  </header>
+
+  <div class="panel">
+    <div class="controls">
+      <div class="field">
+        <label>目標X (mm)</label>
+        <input type="number" id="targetX" value="100" step="10">
+      </div>
+      <div class="field">
+        <label>目標Y (mm)</label>
+        <input type="number" id="targetY" value="-700" step="10">
+      </div>
+      <button id="applyTargetBtn">目標を適用</button>
+      <button id="startBtn" class="primary">スタートスイッチON</button>
+      <button id="stopBtn">ストップ</button>
+      <button id="resetBtn" class="danger">リセット</button>
+      <button id="centerTargetBtn">マップリセット</button>
+      <button id="savePathBtn" class="primary">軌跡保存</button>
+      <button id="releasePathBtn" class="danger">軌跡保存解除</button>
+
+      <div class="field">
+        <label>再生速度</label>
+        <select id="playbackSpeed">
+          <option value="1">1x</option>
+          <option value="2">2x</option>
+          <option value="4">4x</option>
+          <option value="8">8x</option>
+        </select>
+      </div>
+
+      <div class="slider-field">
+        <div class="row"><span>モーター最大速度(目安)</span><span id="maxSpeedVal">400 mm/s</span></div>
+        <input type="range" id="maxSpeedSlider" min="50" max="1000" step="10" value="400">
+      </div>
+    </div>
+  </div>
+
+  <div class="panel canvas-panel">
+    <canvas id="stage"></canvas>
+    <div class="status-grid">
+      <div class="status-cell"><div class="k">X</div><div class="v" id="stX">0 mm</div></div>
+      <div class="status-cell"><div class="k">Y</div><div class="v" id="stY">0 mm</div></div>
+      <div class="status-cell"><div class="k">角度誤差</div><div class="v" id="stAngle">0.0 deg</div></div>
+      <div class="status-cell"><div class="k">距離誤差</div><div class="v" id="stDist">0 mm</div></div>
+      <div class="status-cell"><div class="k">左/右PWM</div><div class="v" id="stPwm">0 / 0</div></div>
+      <div class="status-cell"><div class="k">状態</div><div class="v state-idle" id="stState">待機中</div></div>
+    </div>
+    <div class="saved-panel" id="savedPanel">
+      <div class="saved-head"><span>保存データ</span><span id="savedStateLabel">未保存</span></div>
+      <div class="saved-vars" id="savedVars">
+        <span class="saved-empty">「軌跡保存」を押すと、最後に完了した走行の軌跡と変数を保存します。</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" style="padding:0;">
+    <details>
+      <summary><span class="chev">▶</span> 詳細設定・制御ロジック（コード編集）</summary>
+      <div class="details-body">
+
+        <div class="param-grid" id="paramGrid"></div>
+        <div class="code-actions" style="margin-bottom:14px;">
+          <button id="applyParamsBtn">パラメータを適用</button>
+        </div>
+
+        <div class="arduino-converter">
+          <label style="font-size:12px;color:var(--text-dim);display:block;">
+            Arduinoコードを貼り付け
+            <span class="source-badge">AUTO CONVERT</span>
+          </label>
+          <textarea id="arduinoArea" spellcheck="false" placeholder="#include <Arduino.h>
+
+const int motor_l_A = PB6;
+...
+
+void loop() {
+  bool reached = move(1500, 0);
+  if (reached) {
+    Serial.println("target reached");
+  }
+}"></textarea>
+          <div class="convert-row">
+            <button id="convertArduinoBtn" class="primary">Arduinoコードを自動変換</button>
+            <button id="loadArduinoBtn">サンプルArduinoコード</button>
+            <span id="convertMsg" class="convert-msg info"></span>
+          </div>
+          <p class="hint">
+            <code>setup()</code>、<code>loop()</code>、ピン番号、割り込み、<code>Serial</code>などの実機専用部分はシミュレーター用に自動で読み替えます。
+            <code>move()</code>、PID、<code>constrain()</code>、<code>applyMinPWM()</code>、到達判定などの制御部分を優先して変換します。
+          </p>
+        </div>
+
+        <label style="font-size:12px;color:var(--text-dim);display:block;margin-bottom:8px;">
+          変換後の制御ロジック（自動生成・必要なら手動編集）
+        </label>
+        <textarea id="codeArea" spellcheck="false"></textarea>
+        <div class="code-actions">
+          <button id="applyCodeBtn" class="primary">変換コードを適用</button>
+          <button id="resetCodeBtn">デフォルトに戻す</button>
+          <span id="codeMsg"></span>
+        </div>
+
+        <p class="hint">
+          <code>controlStep(state, params, target_x, target_y, dt, helpers)</code> という関数を定義してください。
+          返り値は <code>{ left, right, done, angleError, distError, status }</code>（left/right は -255〜255 のPWM相当値）。
+          モーター・エンコーダーの物理シミュレーション（オドメトリ積分）はエンジン側が自動で行うので、
+          Arduino側の <code>move()</code> のうち PID・条件分岐・停止判定の部分だけを移植すればOKです。
+          <code>helpers.pid(state, key, error, Kp, Ki, Kd, dt)</code> ・ <code>helpers.constrain</code> ・
+          <code>helpers.applyMinPWM</code> ・ <code>helpers.calcDistanceError</code> ・ <code>helpers.calcAngleError</code> ・
+          <code>helpers.log(msg)</code> が使えます。
+        </p>
+
+        <label style="font-size:12px;color:var(--text-dim);display:block;margin:16px 0 8px;">ログ（Serial.println相当）</label>
+        <div class="log-panel" id="logPanel"></div>
+
+      </div>
+    </details>
+  </div>
+
+</div>
+
+<script>
+(function(){
+
+  // ============================================================
+  // パラメータ（Arduinoコードの const 群に対応。UIから編集可能）
+  // ============================================================
+  const DEFAULT_PARAMS = {
+    Kp_dist: 15.0, Ki_dist: 0.0, Kd_dist: 10.0,
+    Kp_angle: 50.0, Ki_angle: 10.0, Kd_angle: 20.0,
+    slow_zone_dist: 300.0, slow_zone_max_speed: 50, normal_max_speed: 100,
+    stop_dist: 10.0,
+    PWM_max: 150, PWM_min: 45,
+    angle_deadband_deg: 1.1,      // 表示・編集はdeg、内部でradに変換
+    rotate_only_angle_deg: 30.0,  // 表示・編集はdeg、内部でradに変換
+    wheel_base_mm: 410.0
+  };
+  let params = JSON.parse(JSON.stringify(DEFAULT_PARAMS));
+
+  // 詳細設定と保存変数で共通使用する項目定義
+  // 日本語名とArduinoコード内の変数名を併記する。
+  const PARAM_DEFS = [
+    {key:"Kp_dist", label:"距離比例ゲイン", code:"Kp_dist", unit:""},
+    {key:"Ki_dist", label:"距離積分ゲイン", code:"Ki_dist", unit:""},
+    {key:"Kd_dist", label:"距離微分ゲイン", code:"Kd_dist", unit:""},
+    {key:"Kp_angle", label:"角度比例ゲイン", code:"Kp_angle", unit:""},
+    {key:"Ki_angle", label:"角度積分ゲイン", code:"Ki_angle", unit:""},
+    {key:"Kd_angle", label:"角度微分ゲイン", code:"Kd_angle", unit:""},
+    {key:"slow_zone_dist", label:"減速ゾーン距離", code:"slow_zone_dist", unit:"mm"},
+    {key:"slow_zone_max_speed", label:"減速時最大速度", code:"slow_zone_max_speed", unit:""},
+    {key:"normal_max_speed", label:"通常時最大速度", code:"normal_max_speed", unit:""},
+    {key:"stop_dist", label:"到達判定距離", code:"stop_dist", unit:"mm"},
+    {key:"PWM_max", label:"PWM上限", code:"PWM_max", unit:""},
+    {key:"PWM_min", label:"PWM最低値", code:"PWM_min", unit:""},
+    {key:"angle_deadband_deg", label:"角度不感帯", code:"angle_deadband", unit:"deg"},
+    {key:"rotate_only_angle_deg", label:"旋回のみ範囲", code:"rotate_only_angle", unit:"deg"},
+    {key:"wheel_base_mm", label:"左右タイヤ間距離", code:"wheel_base_mm", unit:"mm"}
+  ];
+
+  const PARAM_LABELS = Object.fromEntries(PARAM_DEFS.map(d => [d.key, d.label + " (" + d.code + ")"]));
+
+  function paramsToRuntime(p){
+    return Object.assign({}, p, {
+      angle_deadband: p.angle_deadband_deg * Math.PI / 180,
+      rotate_only_angle: p.rotate_only_angle_deg * Math.PI / 180
+    });
+  }
+
+  // ============================================================
+  // ロボット状態（オドメトリ・PID状態）
+  // ============================================================
+  function freshState(){
+    return {
+      pos_x:0, pos_y:0, theta:0,
+      dist_integral:0, dist_prevError:0,
+      angle_integral:0, angle_prevError:0,
+      start_theta:0,
+      returning_angle:false,
+      mission_finished:false,
+      started:false,
+      paused:false
+    };
+  }
+  let state = freshState();
+  let path = [{x:0,y:0}];
+  // 走行ごとの軌跡を分離して保持し、走行間を直線でつながない
+  let pastRunPaths = [];
+  let target = { x:100, y:-700 };
+  let savedPath = null;
+  let savedSnapshot = null;
+  let lastExecutedPath = null;
+  let lastExecutedSnapshot = null;
+  let lastLeft = 0, lastRight = 0, lastAngleErr = 0, lastDistErr = 0, lastStatus = "待機中";
+
+  // ============================================================
+  // helper関数（Arduinoコードの汎用関数に対応）
+  // ============================================================
+  function constrain(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
+
+  function applyMinPWM(speed, minPwm){
+    if (speed > 0 && speed < minPwm) return minPwm;
+    if (speed < 0 && speed > -minPwm) return -minPwm;
+    return speed;
+  }
+
+  function pid(state, key, error, Kp, Ki, Kd, dt){
+    const ik = key + "_integral", pk = key + "_prevError";
+    state[ik] += error * dt;
+    const derivative = dt > 0 ? (error - state[pk]) / dt : 0;
+    state[pk] = error;
+    return Kp * error + Ki * state[ik] + Kd * derivative;
+  }
+
+  function calcDistanceError(state, tx, ty){
+    const dx = tx - state.pos_x, dy = ty - state.pos_y;
+    return Math.sqrt(dx*dx + dy*dy);
+  }
+
+  function calcAngleError(state, tx, ty){
+    const dx = tx - state.pos_x, dy = ty - state.pos_y;
+    const target_angle = Math.atan2(-dx, dy);
+    let angle_error = target_angle - state.theta;
+    while (angle_error > Math.PI) angle_error -= 2*Math.PI;
+    while (angle_error < -Math.PI) angle_error += 2*Math.PI;
+    return angle_error;
+  }
+
+  function logMsg(msg){
+    const panel = document.getElementById('logPanel');
+    const d = document.createElement('div');
+    const t = new Date().toLocaleTimeString('ja-JP', {hour12:false});
+    d.innerHTML = '<span class="t">'+t+'</span>' + msg;
+    panel.appendChild(d);
+    panel.scrollTop = panel.scrollHeight;
+  }
+
+  const helpers = { constrain, applyMinPWM, pid, calcDistanceError, calcAngleError, log: logMsg };
+
+  // ============================================================
+  // デフォルトの制御ロジック（アップロードされた move() のJS版）
+  // ============================================================
+  const DEFAULT_CODE =
+`function controlStep(state, params, target_x, target_y, dt, helpers) {
+  const { constrain, applyMinPWM, pid, calcDistanceError, calcAngleError, log } = helpers;
+
+  // ============================================================
+  // 目標到着後、スタート方向へ戻す
+  // ============================================================
+  if (state.returning_angle) {
+    let angle_error = state.start_theta - state.theta;
+    while (angle_error > Math.PI)  angle_error -= 2 * Math.PI;
+    while (angle_error < -Math.PI) angle_error += 2 * Math.PI;
+
+    if (Math.abs(angle_error) < params.angle_deadband) {
+      state.returning_angle = false;
+      log("スタート方向に復帰完了");
+      return { left: 0, right: 0, done: true, angleError: angle_error, distError: 0, status: "到達" };
+    }
+
+    let turn = params.Kp_angle * angle_error;
+    turn = constrain(turn, -120, 120);
+
+    let left  = -turn;
+    let right =  turn;
+    left  = applyMinPWM(left,  params.PWM_min);
+    right = applyMinPWM(right, params.PWM_min);
+
+    return { left, right, done: false, angleError: angle_error, distError: 0, status: "スタート方向へ復帰中" };
+  }
+
+  const distance_error = calcDistanceError(state, target_x, target_y);
+
+  // ============================================================
+  // Yがマイナスの場合：旋回せずバックする
+  // ============================================================
+  if (target_y < 0) {
+    if (distance_error < params.stop_dist) {
+      state.dist_integral = 0;  state.dist_prevError = 0;
+      state.angle_integral = 0; state.angle_prevError = 0;
+      state.returning_angle = true;
+      log("目標到着 → スタート方向へ戻ります");
+      return { left: 0, right: 0, done: false, angleError: 0, distError: distance_error, status: "目標到達" };
+    }
+
+    let speed = pid(state, "dist", distance_error, params.Kp_dist, params.Ki_dist, params.Kd_dist, dt);
+    const speed_limit = distance_error < params.slow_zone_dist ? params.slow_zone_max_speed : params.normal_max_speed;
+    speed = constrain(speed, -speed_limit, speed_limit);
+    speed = -speed; // バックなのでマイナス
+
+    let left = speed, right = speed;
+    if (distance_error > 100.0) {
+      left  = applyMinPWM(left,  params.PWM_min);
+      right = applyMinPWM(right, params.PWM_min);
+    }
+    return { left, right, done: false, angleError: 0, distError: distance_error, status: "後退中" };
+  }
+
+  // ============================================================
+  // Yがプラスの場合：目標方向へ向かって走行
+  // ============================================================
+  const angle_error = calcAngleError(state, target_x, target_y);
+
+  if (distance_error < params.stop_dist) {
+    state.dist_integral = 0;  state.dist_prevError = 0;
+    state.angle_integral = 0; state.angle_prevError = 0;
+    state.returning_angle = true;
+    log("目標到着 → スタート方向へ戻ります");
+    return { left: 0, right: 0, done: false, angleError: angle_error, distError: distance_error, status: "目標到達" };
+  }
+
+  // 角度が大きくずれているときは、その場で角度だけ修正
+  if (Math.abs(angle_error) > params.rotate_only_angle) {
+    let turn = params.Kp_angle * angle_error;
+    turn = constrain(turn, -120, 120);
+
+    let left  = -turn;
+    let right =  turn;
+    left  = applyMinPWM(left,  params.PWM_min);
+    right = applyMinPWM(right, params.PWM_min);
+
+    state.dist_integral = 0;  state.dist_prevError = 0;
+    state.angle_integral = 0; state.angle_prevError = angle_error;
+
+    return { left, right, done: false, angleError: angle_error, distError: distance_error, status: "旋回中" };
+  }
+
+  // 角度が十分合ったら、前進しながら角度を補正する
+  const angle_error_for_turn = Math.abs(angle_error) < params.angle_deadband ? 0 : angle_error;
+
+  let speed = pid(state, "dist",  distance_error,       params.Kp_dist,  params.Ki_dist,  params.Kd_dist,  dt);
+  let turn  = pid(state, "angle", angle_error_for_turn, params.Kp_angle, params.Ki_angle, params.Kd_angle, dt);
+
+  const speed_limit = distance_error < params.slow_zone_dist ? params.slow_zone_max_speed : params.normal_max_speed;
+  speed = constrain(speed, -speed_limit, speed_limit);
+  turn  = constrain(turn, -150, 150);
+
+  const turn_ratio = constrain(Math.abs(angle_error) / 1.2, 0.0, 1.0);
+  speed *= (1.0 - 0.7 * turn_ratio);
+
+  let left  = speed - turn;
+  let right = speed + turn;
+
+  const maxAbs = Math.max(Math.abs(left), Math.abs(right));
+  if (maxAbs > params.PWM_max) {
+    const scale = params.PWM_max / maxAbs;
+    left  *= scale;
+    right *= scale;
+  }
+
+  if (distance_error > 100.0) {
+    left  = applyMinPWM(left,  params.PWM_min);
+    right = applyMinPWM(right, params.PWM_min);
+  }
+
+  return { left, right, done: false, angleError: angle_error, distError: distance_error, status: "走行中" };
+}`;
+
+  let controlFn = null;
+  let controlSrc = DEFAULT_CODE;
+
+
+  // ============================================================
+  // Arduino -> Simulator 自動変換
+  // ============================================================
+  const ARDUINO_SAMPLE = "#include <Arduino.h>     \n// ①準備（変数・関数）→ ②初期設定（setup）→ ③実際の動作（loop）     \n  \n  \n// ===== モーター =====     \nconst int motor_l_A = PB6;     \nconst int motor_l_B = PB15;     \nconst int motor_l_PWM = PB10;     \nconst int motor_r_A = PA15;     \nconst int motor_r_B = PC13;     \nconst int motor_r_PWM = PB7;     \n  \n// ===== エンコーダー =====     \n// 左エンコーダー  \nconst int encoder_l_A = PC11;     \nconst int encoder_l_B = PC10;     \nconst int encoder_l_Z = PC1;     \n \n// 右エンコーダー     \nconst int encoder_r_A = PA4;     \nconst int encoder_r_B = PA1;     \nconst int encoder_r_Z = PA0;     \n  \n// ===== スタートスイッチ =====     \nconst int start_switch = PA5;     \nbool started = false; // スイッチが押されてスタートしたかどうか     \n  \nvolatile long encoder_l_count = 0;     \nvolatile long encoder_r_count = 0;     \n  \nconst int pulses_per_rev = 1000; // エンコーダー1回転あたりのパルス数(左右共通と仮定)     \n  \n// ===== 機体パラメータ(要実測して書き換える) =====     \nconst float wheel_radius_mm = 30.0;  // タイヤ半径(mm)     \nconst float wheel_base_mm   = 410.0; // 左右タイヤ間の距離(mm)     \n  \n// ===== オドメトリ(現在位置・向き) =====     \n// この版では座標系を X軸正=右, Y軸正=前 として扱う     \nfloat pos_x = 0;     // 現在位置x(mm) : 右方向が正     \nfloat pos_y = 0;     // 現在位置y(mm) : 前方向が正     \nfloat theta = 0;     // 内部的な回転角(ラジアン, 0=前方向, 増加=左旋回方向の物理回転)     \n \nlong lastCount_l = 0; // 前回オドメトリ計算時点の左エンコーダー値     \nlong lastCount_r = 0; // 前回オドメトリ計算時点の右エンコーダー値     \n  \n// ===== スタート時の角度 =====     \nfloat start_theta = 0; // スタートしたときの角度     \n  \n// ===== 到着後の動作 =====     \nbool returning_angle = false; // 目標到着後にスタート方向へ戻すかどうか     \nbool mission_finished = false; // 全動作が完了したかどうか     \n  \n// ===== PID用変数 =====     \n// 距離制御用     \nconst float Kp_dist = 15.0;  \nconst float Ki_dist = 0.0;  \nconst float Kd_dist = 10.0;     \n \nfloat dist_integral = 0;     \nfloat dist_prevError = 0;     \n \n// 角度制御用     \n// 走りながら常時補正するので、少し強めにしておく     \nconst float Kp_angle = 50.0;  \nconst float Ki_angle = 10.0;  \nconst float Kd_angle = 20.0;     \n \nfloat angle_integral = 0;     \nfloat angle_prevError = 0;     \n  \nunsigned long lastControlTime = 0; // 制御周期を測るための前回時刻     \n  \n// ===== 減速ゾーン(通り過ぎ防止) =====     \nconst float slow_zone_dist = 300.0;    // これ以下の距離になったら速度上限を下げる(mm)     \nconst int   slow_zone_max_speed = 50;  // 減速ゾーン内での最大速度     \nconst int   normal_max_speed = 100;    // 通常時の最大速度     \nconst float stop_dist = 10.0;          // 到達とみなす距離(mm)     \n  \n// ===== PWM上限・最低PWM補正 =====     \nconst int PWM_max = 150;  // モータードライバへの最終出力上限     \nconst int PWM_min = 45;   // モーターが動き出すための最低PWM(実機で要調整)     \n  \n// 角度の不感帯(これ以下の誤差はturnを出さない)     \nconst float angle_deadband = 0.02; // 約1.1度     \n  \n// 角度だけ修正する範囲     \nconst float rotate_only_angle = 0.52; // 約30度     \n  \n// ================= 関数 =================     \n  \n// speedの正負でモーター1個の正転・逆転・停止を切り替え     \nvoid setmotor(int pinA, int pinB, int pinPWM, int speed) {     \n    speed = constrain(speed, -255, 255); // PWM出力の範囲に収める(暴走防止)     \n  \n    if (speed > 0) {     \n        digitalWrite(pinA, LOW);     \n        digitalWrite(pinB, HIGH);     \n        analogWrite(pinPWM, speed);     \n    }  \n    else if (speed < 0) {     \n        digitalWrite(pinA, HIGH);     \n        digitalWrite(pinB, LOW);     \n        analogWrite(pinPWM, -speed);     \n    }  \n    else {     \n        digitalWrite(pinA, LOW);     \n        digitalWrite(pinB, LOW);     \n        analogWrite(pinPWM, 0);     \n    }     \n}     \n  \n// 0ではないのに小さすぎる値を、符号を保ったまま最低PWMまで底上げする     \nint applyMinPWM(int speed, int minPwm) {     \n    if (speed > 0 && speed < minPwm) return minPwm;     \n    if (speed < 0 && speed > -minPwm) return -minPwm;     \n    return speed;     \n}     \n  \n// 左右の速度を指定して同時に駆動(タンク駆動)     \n// leftSpeed, rightSpeed: -255〜255(正=前進, 負=後退, 0=停止)     \nvoid tankdrive(int leftSpeed, int rightSpeed) {     \n    setmotor(motor_l_A, motor_l_B, motor_l_PWM, leftSpeed);     \n    setmotor(motor_r_A, motor_r_B, motor_r_PWM, rightSpeed);     \n}     \n  \n// 左エンコーダー割り込み: B相の状態で回転方向を判定     \nvoid encoder_l_ISR() {     \n    if (digitalRead(encoder_l_B) == HIGH) {     \n        encoder_l_count++;     \n    }  \n    else {     \n        encoder_l_count--;     \n    }     \n}     \n  \n// 右エンコーダー割り込み: B相の状態で回転方向を判定     \nvoid encoder_r_ISR() {     \n    if (digitalRead(encoder_r_B) == HIGH) {     \n        encoder_r_count--;     \n    }  \n    else {     \n        encoder_r_count++;     \n    }     \n}     \n  \n// エンコーダーの増分から現在位置(pos_x, pos_y)と向き(theta)を更新する     \n// 注: pos_x=右方向正, pos_y=前方向正 の座標系に変換して積算する     \nvoid updateOdometry() {     \n    long diff_l = encoder_l_count - lastCount_l; // 前回からの左エンコーダー増分     \n    long diff_r = encoder_r_count - lastCount_r; // 前回からの右エンコーダー増分     \n  \n    lastCount_l = encoder_l_count;     \n    lastCount_r = encoder_r_count;     \n  \n    // パルス数 → 走行距離(mm)に変換     \n    float dist_l = (diff_l / (float)pulses_per_rev) * 2 * PI * wheel_radius_mm;     \n    float dist_r = (diff_r / (float)pulses_per_rev) * 2 * PI * wheel_radius_mm;     \n  \n    float dist_center = (dist_l + dist_r) / 2.0;       // 中心の移動距離     \n    float dtheta = (dist_r - dist_l) / wheel_base_mm;  // 内部回転角の変化量(ラジアン)     \n  \n    // 位置を更新(X=右, Y=前 の座標系にするため sin/cos を入れ替えて符号調整)     \n    pos_x += dist_center * (-sin(theta + dtheta / 2.0));  // 右方向が正     \n    pos_y += dist_center *  cos(theta + dtheta / 2.0);    // 前方向が正     \n  \n    theta += dtheta;     \n  \n    // thetaを-π〜πに正規化     \n    while (theta > PI) theta -= 2 * PI;     \n    while (theta < -PI) theta += 2 * PI;     \n}     \n  \n// 目標座標までの直線距離(mm)を計算     \nfloat calcDistanceError(float target_x, float target_y) {     \n    float dx = target_x - pos_x;     \n    float dy = target_y - pos_y;     \n    return sqrt(dx * dx + dy * dy);     \n}     \n  \n// 目標方向と現在の向き(theta)との角度差を計算(-π〜πに正規化)     \n// 注: dx=右方向の差, dy=前方向の差 を、内部のtheta基準に変換する     \nfloat calcAngleError(float target_x, float target_y) {     \n    float dx = target_x - pos_x;     \n    float dy = target_y - pos_y;     \n  \n    float target_angle = atan2(-dx, dy); // 目標方向の絶対角度(内部theta座標系に変換)     \n    float angle_error = target_angle - theta;     \n  \n    while (angle_error > PI)  angle_error -= 2 * PI;     \n    while (angle_error < -PI) angle_error += 2 * PI;     \n  \n    return angle_error;     \n}     \n  \n// 汎用PID計算関数     \n// error: 現在の誤差, integral/prevError: 呼び出し元で保持する状態変数(参照渡し)     \nfloat pid(float error, float &integral, float &prevError, float Kp, float Ki, float Kd, float dt) {     \n    integral += error * dt;     \n    float derivative = (dt > 0) ? (error - prevError) / dt : 0;     \n    prevError = error;     \n    return Kp * error + Ki * integral + Kd * derivative;     \n}     \n  \nvoid printStatus(float angle_error, float distance_error, int left_speed, int right_speed) {\n    Serial.print(\"X=\");\n    Serial.print(pos_x);\n    Serial.print(\" mm  Y=\");\n    Serial.print(pos_y);\n    Serial.print(\" mm  角度=\");\n    Serial.print(angle_error * 180.0 / PI);\n    Serial.print(\" deg  距離=\");\n    Serial.print(distance_error);\n    Serial.print(\" mm  左PWM=\");\n    Serial.print(left_speed);\n    Serial.print(\" 右PWM=\");\n    Serial.println(right_speed);\n}\n  \n// 目標座標(target_x, target_y)[mm]に向かって1ステップ分の制御を行う     \n// 戻り値: true=到達済み(停止した), false=まだ移動中     \n//     \n// Yがマイナスのときはバックで移動する     \n// 目的地に到着したらその場で停止する     \nbool move(float target_x, float target_y) {     \n    unsigned long now = millis();     \n    float dt = (now - lastControlTime) / 1000.0;     \n    if (dt < 0.01) return false; // 制御周期(50ms)を確保     \n    lastControlTime = now;     \n  \n    updateOdometry(); // 現在位置・向きを更新     \n  \n    // ============================================================\n    // 目標到着後、スタート方向へ戻す\n    // ============================================================\n    if (returning_angle) {\n        float angle_error = start_theta - theta;\n        while (angle_error > PI)  angle_error -= 2 * PI;\n        while (angle_error < -PI) angle_error += 2 * PI;\n\n        // スタート方向に戻ったら停止\n        if (abs(angle_error) < angle_deadband) {\n            tankdrive(0, 0);\n            returning_angle = false;\n            mission_finished = true;\n            printStatus(angle_error, 0, 0, 0);\n            Serial.println(\"スタート方向に復帰完了\");\n            return true;\n        }\n\n        // 角度だけP制御して、その場で旋回\n        float turn = Kp_angle * angle_error;\n        turn = constrain(turn, -120, 120);\n        int left_speed  = (int)(-turn);\n        int right_speed = (int)(turn);\n        left_speed  = applyMinPWM(left_speed, PWM_min);\n        right_speed = applyMinPWM(right_speed, PWM_min);\n        printStatus(angle_error, 0, left_speed, right_speed);\n        tankdrive(left_speed, right_speed);\n        return false;\n    }\n  \n    float distance_error = calcDistanceError(target_x, target_y);     \n  \n    // ============================================================     \n    // Yがマイナスならバックで移動する     \n    // ============================================================     \n    bool reverse = (target_y < 0);     \n  \n    float dx = target_x - pos_x;     \n    float dy = target_y - pos_y;     \n  \n    float target_angle = atan2(-dx, dy);     \n  \n    // バック走行の場合は、機体の後ろ側を目標方向にする     \n    if (reverse) {     \n        target_angle += PI;     \n  \n        while (target_angle > PI)  target_angle -= 2 * PI;     \n        while (target_angle < -PI) target_angle += 2 * PI;     \n    }     \n  \n    float angle_error = target_angle - theta;     \n  \n    while (angle_error > PI)  angle_error -= 2 * PI;     \n    while (angle_error < -PI) angle_error += 2 * PI;     \n  \n    // 目標に十分近づいたら停止     \n    if (distance_error < stop_dist) {     \n        tankdrive(0, 0);     \n  \n        dist_integral = 0;     \n        dist_prevError = 0;     \n  \n        angle_integral = 0;     \n        angle_prevError = 0;     \n  \n        printStatus(angle_error, distance_error, 0, 0);\n  \n        // 目標到着後、スタート方向へ戻す\n        returning_angle = true;\n        Serial.println(\"目標到着 → スタート方向へ戻ります\");\n        return false;\n    }     \n  \n    // 角度が大きくずれているときは、その場で角度だけ修正する     \n    if (abs(angle_error) > rotate_only_angle) {     \n  \n        // 角度修正中はP制御だけを使用する     \n        float turn = Kp_angle * angle_error;     \n        turn = constrain(turn, -120, 120);     \n  \n        // 左右を逆方向に回して、その場で旋回する     \n        int left_speed  = (int)(-turn);     \n        int right_speed = (int)(turn);     \n  \n        // モーターが動き出すための最低PWM     \n        left_speed  = applyMinPWM(left_speed, PWM_min);     \n        right_speed = applyMinPWM(right_speed, PWM_min);     \n  \n        printStatus(angle_error, distance_error, left_speed, right_speed);\n        tankdrive(left_speed, right_speed);     \n  \n        // 角度修正中は距離PIDをリセット     \n        dist_integral = 0;     \n        dist_prevError = 0;     \n  \n        // 角度PIDの状態もリセット     \n        angle_integral = 0;     \n        angle_prevError = angle_error;     \n  \n        return false;     \n    }     \n  \n    // ============================================================     \n    // 角度が十分合ったら、前進またはバックしながら角度を補正する     \n    // ============================================================     \n  \n    // 角度の不感帯(これ以下の誤差はturnを出さない)     \n    float angle_error_for_turn = (abs(angle_error) < angle_deadband) ? 0 : angle_error;     \n  \n    // 距離用PIDと角度用PIDを常に同時に計算する     \n    float speed = pid(distance_error, dist_integral, dist_prevError, Kp_dist, Ki_dist, Kd_dist, dt);     \n    float turn  = pid(angle_error_for_turn, angle_integral, angle_prevError, Kp_angle, Ki_angle, Kd_angle, dt);     \n  \n    // 目標に近づいたら速度上限を下げて、通り過ぎ(オーバーシュート)を防ぐ     \n    int speed_limit = (distance_error < slow_zone_dist) ? slow_zone_max_speed : normal_max_speed;     \n    speed = constrain(speed, -speed_limit, speed_limit);     \n    turn  = constrain(turn, -150, 150);     \n  \n    // 角度が大きくずれているときは前進速度を少し弱めて、回頭を優先させる     \n    // (完全に0にはしないので「走りながら」感は保たれる)     \n    float turn_ratio = constrain(abs(angle_error) / 1.2, 0.0, 1.0); // 1.2rad(約69度)でほぼ0倍     \n    speed *= (1.0 - 0.7 * turn_ratio);     \n  \n    // Yがマイナスの場合はバック走行     \n    if (reverse) {     \n        speed = -speed;     \n    }     \n  \n    int left_speed  = (int)(speed - turn);     \n    int right_speed = (int)(speed + turn);     \n  \n    // 左右どちらかがPWM上限を超えたら、比率を保ったまま両方を縮小する     \n    // (turnをclampで切り捨てず、speedとの相対関係を保つのがポイント)     \n    int maxAbs = max(abs(left_speed), abs(right_speed));     \n    if (maxAbs > PWM_max) {     \n        float scale = (float)PWM_max / maxAbs;     \n        left_speed  = (int)(left_speed  * scale);     \n        right_speed = (int)(right_speed * scale);     \n    }     \n  \n    // PID出力は正しいのにPWMが小さすぎてモーターが動かない問題への対策     \n    if (distance_error > 100.0) {     \n        left_speed  = applyMinPWM(left_speed, PWM_min);     \n        right_speed = applyMinPWM(right_speed, PWM_min);     \n    }     \n  \n    printStatus(angle_error, distance_error, left_speed, right_speed);\n    tankdrive(left_speed, right_speed);     \n    return false;     \n}     \n  \nvoid setup() {     \n    // モーター左     \n    pinMode(motor_l_A, OUTPUT);     \n    pinMode(motor_l_B, OUTPUT);     \n    pinMode(motor_l_PWM, OUTPUT);     \n  \n    // モーター右     \n    pinMode(motor_r_A, OUTPUT);     \n    pinMode(motor_r_B, OUTPUT);     \n    pinMode(motor_r_PWM, OUTPUT);     \n  \n    // エンコーダー左     \n    pinMode(encoder_l_A, INPUT_PULLUP);     \n    pinMode(encoder_l_B, INPUT_PULLUP);     \n    pinMode(encoder_l_Z, INPUT_PULLUP);     \n    attachInterrupt(digitalPinToInterrupt(encoder_l_A), encoder_l_ISR, RISING);     \n  \n    // エンコーダー右     \n    pinMode(encoder_r_A, INPUT_PULLUP);     \n    pinMode(encoder_r_B, INPUT_PULLUP);     \n    pinMode(encoder_r_Z, INPUT_PULLUP);     \n    attachInterrupt(digitalPinToInterrupt(encoder_r_A), encoder_r_ISR, RISING);     \n  \n    // スタートスイッチ     \n    pinMode(start_switch, INPUT_PULLUP); // 押すとLOWになる想定     \n  \n    Serial.begin(115200);     \n}     \n  \nvoid loop() {  \n    if (!started) {  \n        if (digitalRead(start_switch) == LOW) {  \n            started = true;  \n            // スタート時の角度を保存  \n            start_theta = theta;  \n            lastControlTime = millis();  \n            Serial.println(\"スタート！\");  \n        }  \n        return;  \n    }  \n  \n    // 全動作が完了したら何もしない  \n    if (mission_finished) {  \n        return;  \n    }  \n  \n    // ===== 目標座標 ===== \n    // ここを変更すれば目標を変えられる \n    bool reached = move(0, 0);  \n  \n    if (reached) {  \n        Serial.println(\"target reached\");  \n    }  \n}"
+
+  function stripCppComments(src){
+    return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|\s)\/\/.*$/gm, '$1');
+  }
+
+  function findFunctionBody(src, name){
+    const re = new RegExp('(?:bool|void|float|double|int|long)\\s+' + name + '\\s*\\([^)]*\\)\\s*\\{', 'm');
+    const m = re.exec(src);
+    if(!m) return null;
+    const start = m.index + m[0].length;
+    let depth = 1, inStr = false, quote = '';
+    for(let i=start;i<src.length;i++){
+      const c=src[i], prev=src[i-1];
+      if(inStr){
+        if(c===quote && prev!=='\\') inStr=false;
+        continue;
+      }
+      if(c==='"' || c==="'"){ inStr=true; quote=c; continue; }
+      if(c==='{') depth++;
+      else if(c==='}') { depth--; if(depth===0) return src.slice(start,i); }
+    }
+    return null;
+  }
+
+  function extractArduinoParams(src){
+    const found={};
+    const re=/(?:const\s+)?(?:volatile\s+)?(?:unsigned\s+)?(?:long|int|float|double|bool)\s+([A-Za-z_]\w*)\s*=\s*([^;]+);/g;
+    let m;
+    while((m=re.exec(src))){
+      const key=m[1], raw=m[2].trim();
+      if(/^(?:P[ABCDEFGH]\d+|HIGH|LOW|INPUT|OUTPUT|INPUT_PULLUP|RISING|FALLING)$/.test(raw)) continue;
+      const value=Number(raw.replace(/f$/i,''));
+      if(!Number.isFinite(value)) continue;
+      if(key==='angle_deadband') found.angle_deadband_deg=value*180/Math.PI;
+      else if(key==='rotate_only_angle') found.rotate_only_angle_deg=value*180/Math.PI;
+      else found[key]=value;
+    }
+    return found;
+  }
+
+  function detectMoveTarget(src){
+    const body=findFunctionBody(src,'loop');
+    if(!body) return null;
+    let m=body.match(/\bmove\s*\(\s*([-+]?\d*\.?\d+)\s*,\s*([-+]?\d*\.?\d+)\s*\)/);
+    return m ? {x:Number(m[1]), y:Number(m[2])} : null;
+  }
+
+  function replacePidCalls(code){
+    return code.replace(/\bpid\s*\(\s*([^,]+)\s*,\s*([^,]+)\s*,\s*([^,]+)\s*,\s*([^,]+)\s*,\s*([^,]+)\s*,\s*([^,]+)\s*,\s*([^,)]+)\s*\)/g,
+      (_,error,integral,prev,kp,ki,kd,dt)=>{
+        const a=integral.trim();
+        const key=/angle/i.test(a)?'angle':'dist';
+        return `helpers.pid(state, "${key}", ${error.trim()}, ${kp.trim()}, ${ki.trim()}, ${kd.trim()}, ${dt.trim()})`;
+      });
+  }
+
+  function translateArduinoBody(body){
+    let s=body;
+
+    // 実機の時間計測・エンコーダ更新・表示処理をシミュレーター側へ移す
+    s=s.replace(/(?:unsigned\s+long|long|float|double|int)\s+now\s*=\s*millis\s*\(\s*\)\s*;?/g,'');
+    s=s.replace(/(?:float|double)\s+dt\s*=\s*[^;]*;/g,'');
+    s=s.replace(/if\s*\(\s*dt\s*<\s*[^)]*\)\s*return\s+false\s*;/g,'');
+    s=s.replace(/lastControlTime\s*=\s*now\s*;/g,'');
+    s=s.replace(/\bupdateOdometry\s*\(\s*\)\s*;/g,'');
+    s=s.replace(/\bprintStatus\s*\([^;]*\)\s*;/g,'');
+
+    // ローカル宣言をJSへ
+    s=s.replace(/\b(?:unsigned\s+long|long|float|double|int|bool|byte|size_t)\s+([A-Za-z_]\w*)\s*(=)/g,'let $1 $2');
+    s=s.replace(/\b(?:unsigned\s+long|long|float|double|int|bool|byte|size_t)\s+([A-Za-z_]\w*)\s*;/g,'let $1;');
+
+    // Arduino/C -> JS
+    s=s.replace(/\babs\s*\(/g,'Math.abs(');
+    s=s.replace(/\bsqrt\s*\(/g,'Math.sqrt(');
+    s=s.replace(/\bsin\s*\(/g,'Math.sin(');
+    s=s.replace(/\bcos\s*\(/g,'Math.cos(');
+    s=s.replace(/\batan2\s*\(/g,'Math.atan2(');
+    s=s.replace(/\bmax\s*\(/g,'Math.max(');
+    s=s.replace(/\bmin\s*\(/g,'Math.min(');
+    s=s.replace(/\bPI\b/g,'Math.PI');
+    s=s.replace(/\bconstrain\s*\(/g,'helpers.constrain(');
+    s=replacePidCalls(s);
+
+    // Arduinoの位置/PID状態をシミュレーターのstateへ接続
+    ['pos_x','pos_y','theta','dist_integral','dist_prevError','angle_integral','angle_prevError','start_theta','returning_angle','mission_finished'].forEach(k=>{
+      s=s.replace(new RegExp('(?<![.\\w])'+k+'\\b','g'),'state.'+k);
+    });
+
+    // Arduinoの補助関数をhelpersへ
+    s=s.replace(/\bcalcDistanceError\s*\(\s*([^,]+)\s*,\s*([^)]+)\)/g,'helpers.calcDistanceError(state, $1, $2)');
+    s=s.replace(/\bcalcAngleError\s*\(\s*([^,]+)\s*,\s*([^)]+)\)/g,'helpers.calcAngleError(state, $1, $2)');
+    s=s.replace(/\bapplyMinPWM\s*\(/g,'helpers.applyMinPWM(');
+
+    // Serialはログへ（複雑な連結にも対応）
+    s=s.replace(/\bSerial\.println\s*\(([^;]*)\)\s*;/g,'helpers.log($1);');
+    s=s.replace(/\bSerial\.print\s*\(([^;]*)\)\s*;/g,'helpers.log(String($1));');
+
+    // モーター出力は物理エンジンに渡す左右速度へ
+    s=s.replace(/\btankdrive\s*\(\s*([^,]+)\s*,\s*([^)]+)\)\s*;/g,'left = $1; right = $2;');
+    s=s.replace(/\bsetmotor\s*\([^;]+\)\s*;/g,'');
+    s=s.replace(/\b(?:delay|pinMode|attachInterrupt|analogWrite|digitalWrite)\s*\([^;]*\)\s*;/g,'');
+    s=s.replace(/\bdigitalRead\s*\([^)]*\)/g,'HIGH');
+
+    // C/C++ キャスト
+    s=s.replace(/\(\s*(?:int|float|double|long)\s*\)\s*/g,'');
+
+    // Arduinoのグローバル定数をparamsから参照
+    const names=['Kp_dist','Ki_dist','Kd_dist','Kp_angle','Ki_angle','Kd_angle','slow_zone_dist','slow_zone_max_speed','normal_max_speed','stop_dist','PWM_max','PWM_min','angle_deadband','rotate_only_angle','wheel_base_mm'];
+    names.forEach(k=>{
+      s=s.replace(new RegExp('(?<![.\\w])'+k+'\\b','g'),'params.'+k);
+    });
+
+    return s;
+  }
+
+  function buildConvertedCode(src){
+    const clean=stripCppComments(src);
+    const moveBody=findFunctionBody(clean,'move');
+    if(!moveBody) throw new Error('move() 関数が見つかりません。現在は move(target_x, target_y) を使うArduinoコードに対応しています。');
+
+    const p=extractArduinoParams(clean);
+    let body=translateArduinoBody(moveBody);
+
+    // move()はシミュレーターの controlStep() そのものとして実行
+    body=body.replace(/\breturn\s+true\s*;/g,
+      'return {left:0,right:0,done:true,angleError:(typeof angle_error!=="undefined"?angle_error:0),distError:(typeof distance_error!=="undefined"?distance_error:0),status:"到達"};');
+    body=body.replace(/\breturn\s+false\s*;/g,
+      'return {left,right,done:false,angleError:(typeof angle_error!=="undefined"?angle_error:0),distError:(typeof distance_error!=="undefined"?distance_error:0),status:"走行中"};');
+
+    // 変換後に必ず出力変数が存在するようにする
+    body='let left=0;\n  let right=0;\n'+body;
+    if(!/return\s*\{/.test(body)){
+      body+='\n  return {left,right,done:false,angleError:(typeof angle_error!=="undefined"?angle_error:0),distError:(typeof distance_error!=="undefined"?distance_error:0),status:"走行中"};';
+    }
+
+    // ArduinoのPID/制御パラメータをUIへ反映
+    const supported=Object.keys(DEFAULT_PARAMS);
+    const applied={};
+    supported.forEach(k=>{if(Object.prototype.hasOwnProperty.call(p,k)) applied[k]=p[k];});
+
+    const header=`function controlStep(state, params, target_x, target_y, dt, helpers) {\n  ${Object.keys(applied).map(k=>`/* ${k}=${applied[k]} */`).join('\n  ')}\n`;
+    return {code:header+body+'\n}',params:applied,target:detectMoveTarget(src)};
+  }
+
+  function compileCode(src){
+    try{
+      const fn = new Function('state','params','target_x','target_y','dt','helpers',
+        src + '\nreturn controlStep(state, params, target_x, target_y, dt, helpers);');
+      // 軽い動作確認（例外が出ないか）
+      const testState = freshState();
+      fn(testState, paramsToRuntime(params), 100, -700, 0.01, helpers);
+      controlFn = fn;
+      controlSrc = src;
+      return { ok:true };
+    } catch(e){
+      return { ok:false, error: e.message };
+    }
+  }
+  compileCode(DEFAULT_CODE);
+
+  // ============================================================
+  // 物理シミュレーション（エンコーダー・オドメトリ相当。固定ロジック）
+  // ============================================================
+  let engine = { maxSpeedMmS: 400 };
+
+  function physicsStep(left, right, dt){
+    const vL = (left  / 255) * engine.maxSpeedMmS;
+    const vR = (right / 255) * engine.maxSpeedMmS;
+    const distL = vL * dt, distR = vR * dt;
+    const distCenter = (distL + distR) / 2.0;
+    const dtheta = (distR - distL) / params.wheel_base_mm;
+
+    state.pos_x += distCenter * (-Math.sin(state.theta + dtheta/2.0));
+    state.pos_y += distCenter * ( Math.cos(state.theta + dtheta/2.0));
+    state.theta += dtheta;
+
+    while (state.theta > Math.PI)  state.theta -= 2*Math.PI;
+    while (state.theta < -Math.PI) state.theta += 2*Math.PI;
+  }
+
+  // ============================================================
+  // メインループ
+  // ============================================================
+  const FIXED_DT = 0.01; // 100Hz相当
+  let accumulator = 0;
+  let lastTs = null;
+  let playbackSpeed = 1;
+  let codeError = null;
+
+  function simulateStep(){
+    if (!state.started || state.paused || state.mission_finished) return;
+
+    let result;
+    try{
+      result = controlFn(state, paramsToRuntime(params), target.x, target.y, FIXED_DT, helpers);
+    } catch(e){
+      codeError = e.message;
+      showCodeMsg('実行時エラー: ' + e.message, true);
+      state.started = false;
+      state.paused = false;
+      stopBtn.textContent = 'ストップ';
+      return;
+    }
+
+    const left = constrain(result.left, -255, 255);
+    const right = constrain(result.right, -255, 255);
+
+    physicsStep(left, right, FIXED_DT);
+    const currentPoint = {x: state.pos_x, y: state.pos_y};
+    path.push(currentPoint);
+    currentRunPath.push({x: currentPoint.x, y: currentPoint.y});
+    autoAdjustMapIfOutOfView();
+
+    lastLeft = Math.round(left);
+    lastRight = Math.round(right);
+    lastAngleErr = result.angleError || 0;
+    lastDistErr = result.distError || 0;
+    lastStatus = result.status || '';
+
+    if (result.done){
+      state.mission_finished = true;
+      lastStatus = '到達';
+
+        // この走行を「最後に実行した走行」として確定保存する。
+      // 保存対象は実際にロボットが通った軌跡(path)だけ。
+      // 原点→目標の最短経路線(goalLine)は保存しない。
+      // 保存対象はこの走行だけ。過去の走行や表示用の最短経路線は含めない。
+      lastExecutedPath = currentRunPath.map(p => ({x:p.x, y:p.y}));
+      lastExecutedSnapshot = {
+        pos_x: state.pos_x,
+        pos_y: state.pos_y,
+        theta: state.theta,
+        target_x: target.x,
+        target_y: target.y,
+        angle_error: lastAngleErr,
+        left_pwm: lastLeft,
+        right_pwm: lastRight,
+        dist_integral: state.dist_integral,
+        dist_prevError: state.dist_prevError,
+        angle_integral: state.angle_integral,
+        angle_prevError: state.angle_prevError,
+        start_theta: state.start_theta,
+        returning_angle: state.returning_angle,
+        mission_finished: state.mission_finished,
+        path_points: lastExecutedPath.length
+      };
+    }
+  }
+
+  function frame(ts){
+    if (lastTs === null) lastTs = ts;
+    let realDt = (ts - lastTs) / 1000;
+    lastTs = ts;
+    realDt = Math.min(realDt, 0.1); // タブ切り替え等の巨大dt対策
+
+    accumulator += realDt * playbackSpeed;
+    let steps = 0;
+    while (accumulator >= FIXED_DT && steps < 400){
+      simulateStep();
+      accumulator -= FIXED_DT;
+      steps++;
+    }
+
+    render();
+    updateStatus();
+    requestAnimationFrame(frame);
+  }
+
+  // ============================================================
+  // 描画
+  // ============================================================
+  const canvas = document.getElementById('stage');
+  const ctx = canvas.getContext('2d');
+  let dpr = window.devicePixelRatio || 1;
+  let viewScale = 0.15; // px per mm
+  // マップの原点を画面上で動かすための座標。ドラッグで変更する。
+  let viewOriginX = 0;
+  let viewOriginY = 0;
+  let viewInitialized = false;
+  let isPanning = false;
+  let panLastX = 0;
+  let panLastY = 0;
+
+  function resizeCanvas(){
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    if (!viewInitialized) {
+      viewOriginX = rect.width / 2;
+      viewOriginY = rect.height * 0.28;
+      viewScale = 0.15;
+      viewInitialized = true;
+    }
+  }
+  window.addEventListener('resize', resizeCanvas);
+
+  // 縮尺は「目標値」を基準に決める（毎フレーム自動調整ではなく、
+  // 目標を適用/リセットしたタイミングで計算し、軌跡がはみ出た時だけ再計算する）
+  function computeFitScale(){
+    const rect = canvas.getBoundingClientRect();
+    const w = rect.width, h = rect.height;
+    const originX = w / 2;
+    const originY = h * 0.28;
+
+    let upMax = 60, downMax = 60, leftMax = 60, rightMax = 60; // mm。最低ズーム量の下限
+    function consider(px, py){
+      if (px >= 0) rightMax = Math.max(rightMax, px); else leftMax = Math.max(leftMax, -px);
+      if (py >= 0) upMax    = Math.max(upMax, py);    else downMax = Math.max(downMax, -py);
+    }
+    consider(target.x, target.y);
+    consider(state.pos_x, state.pos_y);
+    for (const p of path) consider(p.x, p.y);
+    for (const runPath of pastRunPaths){
+      for (const p of runPath) consider(p.x, p.y);
+    }
+
+    const margin = 0.85;
+    const availUp    = originY * margin;
+    const availDown  = (h - originY) * margin;
+    const availLeft  = originX * margin;
+    const availRight = originX * margin;
+
+    const scale = Math.min(
+      availUp / upMax, availDown / downMax,
+      availLeft / leftMax, availRight / rightMax,
+      1.5
+    );
+    return Math.max(scale, 0.01);
+  }
+
+  function fitScaleToTarget(){
+    const rect = canvas.getBoundingClientRect();
+    const w = rect.width, h = rect.height;
+
+    // マップの中心は「原点」と「目標地点」の中点にする
+    const centerX = target.x / 2;
+    const centerY = target.y / 2;
+
+    // 原点と目標地点が画面内に余裕を持って入る縮尺にする
+    const spanX = Math.max(Math.abs(target.x), 120);
+    const spanY = Math.max(Math.abs(target.y), 120);
+    const margin = 0.82;
+    viewScale = clampScale(Math.min((w * margin) / spanX, (h * margin) / spanY));
+
+    viewOriginX = w / 2 - centerX * viewScale;
+    viewOriginY = h / 2 + centerY * viewScale;
+  }
+
+  function resetMapView(){
+    // 表示だけを「原点と目標の中点」に戻す。軌跡や走行状態は消さない
+    fitScaleToTarget();
+  }
+
+  function toCanvas(px, py){
+    return {
+      x: viewOriginX + px * viewScale,
+      y: viewOriginY - py * viewScale
+    };
+  }
+
+  function canvasToWorld(cx, cy){
+    return {
+      x: (cx - viewOriginX) / viewScale,
+      y: (viewOriginY - cy) / viewScale
+    };
+  }
+
+  function clampScale(v){
+    return Math.max(0.015, Math.min(3.0, v));
+  }
+
+  // 走行中にロボットまたは現在の軌跡が画面外へ飛び出したときだけ、
+  // 現在の表示を保ちながら自動で縮尺・位置を調整する。
+  function autoAdjustMapIfOutOfView(){
+    if (!state.started || state.mission_finished) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const w = rect.width;
+    const h = rect.height;
+    const pad = 36;
+
+    const robot = toCanvas(state.pos_x, state.pos_y);
+    const robotOut = robot.x < pad || robot.x > w - pad || robot.y < pad || robot.y > h - pad;
+    if (!robotOut) return;
+
+    // 原点・目標・現在位置・軌跡の範囲を基準に、
+    // 飛び出さないよう縮尺を下げて全体を画面内へ収める。
+    const points = [
+      {x:0, y:0},
+      {x:target.x, y:target.y},
+      {x:state.pos_x, y:state.pos_y}
+    ];
+    if (path.length > 1){
+      const step = Math.max(1, Math.ceil(path.length / 120));
+      for (let i = 0; i < path.length; i += step) points.push(path[i]);
+      points.push(path[path.length - 1]);
+    }
+
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const pt of points){
+      minX = Math.min(minX, pt.x);
+      maxX = Math.max(maxX, pt.x);
+      minY = Math.min(minY, pt.y);
+      maxY = Math.max(maxY, pt.y);
+    }
+
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+    const spanX = Math.max(maxX - minX, 120);
+    const spanY = Math.max(maxY - minY, 120);
+    const margin = 0.82;
+    const newScale = clampScale(Math.min((w * margin) / spanX, (h * margin) / spanY));
+
+    viewScale = newScale;
+    viewOriginX = w / 2 - centerX * viewScale;
+    viewOriginY = h / 2 + centerY * viewScale;
+  }
+
+  // ============================================================
+  // マップ操作：ドラッグ移動 / ホイールズーム
+  // ============================================================
+  canvas.addEventListener('pointerdown', (e) => {
+    isPanning = true;
+    panLastX = e.clientX;
+    panLastY = e.clientY;
+    canvas.style.cursor = 'grabbing';
+    canvas.setPointerCapture(e.pointerId);
+  });
+
+  canvas.addEventListener('pointermove', (e) => {
+    if (!isPanning) return;
+    const dx = e.clientX - panLastX;
+    const dy = e.clientY - panLastY;
+    panLastX = e.clientX;
+    panLastY = e.clientY;
+    viewOriginX += dx;
+    viewOriginY += dy;
+  });
+
+  function endPan(e){
+    isPanning = false;
+    canvas.style.cursor = 'grab';
+    try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
+  }
+  canvas.addEventListener('pointerup', endPan);
+  canvas.addEventListener('pointercancel', endPan);
+
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const before = canvasToWorld(mx, my);
+    const zoom = Math.exp(-e.deltaY * 0.0015);
+    viewScale = clampScale(viewScale * zoom);
+    // マウス位置のワールド座標が同じ画面位置に残るように原点を調整
+    viewOriginX = mx - before.x * viewScale;
+    viewOriginY = my + before.y * viewScale;
+  }, {passive:false});
+
+  canvas.addEventListener('dblclick', () => {
+    fitScaleToTarget();
+  });
+
+  function render(){
+    const rect = canvas.getBoundingClientRect();
+    const w = rect.width, h = rect.height;
+    ctx.clearRect(0,0,w,h);
+
+    const origin = toCanvas(0,0);
+
+    // グリッド
+    ctx.strokeStyle = 'rgba(255,255,255,0.035)';
+    ctx.lineWidth = 1;
+    const gridStep = 200 * viewScale;
+    if (gridStep > 8){
+      for (let x = origin.x % gridStep; x < w; x += gridStep){
+        ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke();
+      }
+      for (let y = origin.y % gridStep; y < h; y += gridStep){
+        ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke();
+      }
+    }
+
+    // 軸（クロスヘア）
+    ctx.strokeStyle = 'rgba(255,255,255,0.14)';
+    ctx.beginPath(); ctx.moveTo(origin.x, 0); ctx.lineTo(origin.x, h); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, origin.y); ctx.lineTo(w, origin.y); ctx.stroke();
+
+    // 最短経路（原点→目標の直線）
+    const goalLine = toCanvas(target.x, target.y);
+    const originPoint = toCanvas(0, 0);
+    ctx.save();
+    ctx.strokeStyle = '#EF6B6B';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([7, 6]);
+    ctx.beginPath();
+    ctx.moveTo(originPoint.x, originPoint.y);
+    ctx.lineTo(goalLine.x, goalLine.y);
+    ctx.stroke();
+    ctx.restore();
+
+    // 目標マーカー
+    const tgt = goalLine;
+    ctx.strokeStyle = '#F2A93B';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(tgt.x, tgt.y, 8, 0, Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(tgt.x-12, tgt.y); ctx.lineTo(tgt.x+12, tgt.y); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(tgt.x, tgt.y-12); ctx.lineTo(tgt.x, tgt.y+12); ctx.stroke();
+
+    // 保存した軌跡（黄色）
+    if (savedPath && savedPath.length > 1){
+      ctx.strokeStyle = '#FFD400';
+      ctx.lineWidth = 3;
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      let firstSaved = true;
+      for (const sp of savedPath){
+        const cp = toCanvas(sp.x, sp.y);
+        if (firstSaved){
+          ctx.moveTo(cp.x, cp.y);
+          firstSaved = false;
+        } else {
+          ctx.lineTo(cp.x, cp.y);
+        }
+      }
+      ctx.stroke();
+    }
+
+    // 現在までの各走行軌跡を別々に描画
+    // 走行と走行の間は線でつながない
+    ctx.strokeStyle = '#4FC9D8';
+    ctx.lineWidth = 2;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    for (const runPath of pastRunPaths){
+      if (!runPath || runPath.length < 2) continue;
+      ctx.beginPath();
+      let first = true;
+      for (const p of runPath){
+        const cp = toCanvas(p.x, p.y);
+        if (first){
+          ctx.moveTo(cp.x, cp.y);
+          first = false;
+        } else {
+          ctx.lineTo(cp.x, cp.y);
+        }
+      }
+      ctx.stroke();
+    }
+    if (path.length > 1){
+      ctx.beginPath();
+      let first = true;
+      for (const p of path){
+        const cp = toCanvas(p.x, p.y);
+        if (first){
+          ctx.moveTo(cp.x, cp.y);
+          first = false;
+        } else {
+          ctx.lineTo(cp.x, cp.y);
+        }
+      }
+      ctx.stroke();
+    }
+
+    // ロボット（三角形 = 向き）
+    const rp = toCanvas(state.pos_x, state.pos_y);
+    const headLen = 16;
+    const hx = -Math.sin(state.theta), hy = Math.cos(state.theta);
+    const cdx = hx * headLen, cdy = -hy * headLen;
+
+    ctx.fillStyle = 'rgba(74,222,128,0.18)';
+    ctx.beginPath(); ctx.arc(rp.x, rp.y, 11, 0, Math.PI*2); ctx.fill();
+
+    ctx.save();
+    ctx.translate(rp.x, rp.y);
+    const screenAngle = Math.atan2(cdy, cdx);
+    ctx.rotate(screenAngle);
+    ctx.fillStyle = '#4ADE80';
+    ctx.beginPath();
+    ctx.moveTo(headLen, 0);
+    ctx.lineTo(-headLen*0.6, headLen*0.55);
+    ctx.lineTo(-headLen*0.6, -headLen*0.55);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function updateStatus(){
+    document.getElementById('stX').textContent = Math.round(state.pos_x) + ' mm';
+    document.getElementById('stY').textContent = Math.round(state.pos_y) + ' mm';
+    document.getElementById('stAngle').textContent = (lastAngleErr * 180/Math.PI).toFixed(1) + ' deg';
+    document.getElementById('stDist').textContent = Math.round(lastDistErr) + ' mm';
+    document.getElementById('stPwm').textContent = lastLeft + ' / ' + lastRight;
+
+    const stEl = document.getElementById('stState');
+    let label = '待機中';
+    if (state.mission_finished) label = '到達';
+    else if (state.started && state.paused) label = '停止中';
+    else if (state.started) label = lastStatus || '走行中';
+    stEl.textContent = label;
+    stEl.className = 'v ' + (state.mission_finished ? 'state-done' : (state.started ? 'state-run' : 'state-idle'));
+  }
+
+  function formatSavedValue(value){
+    if (typeof value === 'number'){
+      return Number.isInteger(value) ? String(value) : value.toFixed(4).replace(/0+$/,'').replace(/\.$/,'');
+    }
+    return String(value);
+  }
+
+  function updateSavedPanel(){
+    const label = document.getElementById('savedStateLabel');
+    const vars = document.getElementById('savedVars');
+    if (!savedSnapshot){
+      label.textContent = '未保存';
+      vars.innerHTML = '<span class="saved-empty">「軌跡保存」を押すと、最後に完了した走行の詳細設定値を保存します。</span>';
+      return;
+    }
+
+    label.textContent = '保存済み（最後に完了した走行）';
+
+    const rows = PARAM_DEFS.map(def => {
+      const value = savedSnapshot.params && savedSnapshot.params[def.key] !== undefined
+        ? savedSnapshot.params[def.key] : '';
+      return '<div class="saved-var">' +
+        '<span class="saved-jp">' + def.label + '</span>' +
+        '<span class="saved-code">(' + def.code + ')</span>' +
+        '<span class="saved-value">(' + formatSavedValue(value) + (def.unit ? ' ' + def.unit : '') + ')</span>' +
+      '</div>';
+    }).join('');
+
+    vars.innerHTML = rows;
+  }
+
+  function saveCurrentPath(){
+    // 保存対象は「保存ボタンを押す前に最後に完了した走行」のみ
+    if (!lastExecutedPath || !lastExecutedSnapshot){
+      logMsg('保存できる完了済みの走行がありません');
+      return;
+    }
+
+    // 既存の保存内容は上書き
+    // 保存するのは実際の走行軌跡だけ。
+    // 最短経路の赤点線(goalLine)や距離表示などの表示用データは一切含めない。
+    savedPath = [];
+    for (const p of lastExecutedPath){
+      const prev = savedPath[savedPath.length - 1];
+      if (!prev || prev.x !== p.x || prev.y !== p.y){
+        savedPath.push({x:p.x, y:p.y});
+      }
+    }
+    savedSnapshot = Object.assign({}, lastExecutedSnapshot, {
+      path_points: savedPath.length,
+      params: JSON.parse(JSON.stringify(params))
+    });
+    updateSavedPanel();
+    render();
+    logMsg('最後に実行した走行の軌跡と値を保存しました（上書き）');
+  }
+
+  function releaseSavedPath(){
+    savedPath = null;
+    savedSnapshot = null;
+    updateSavedPanel();
+    render();
+    logMsg('保存した軌跡と値を削除しました');
+  }
+
+  // ============================================================
+  // UI配線
+  // ============================================================
+  function buildParamGrid(){
+    const grid = document.getElementById('paramGrid');
+    grid.innerHTML = '';
+    PARAM_DEFS.forEach(def => {
+      const wrap = document.createElement('div');
+      wrap.className = 'field';
+
+      const label = document.createElement('label');
+      label.textContent = def.label;
+
+      const code = document.createElement('span');
+      code.className = 'param-code';
+      code.textContent = '(' + def.code + ')';
+
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.step = 'any';
+      input.id = 'param_' + def.key;
+      input.value = params[def.key];
+
+      wrap.appendChild(label);
+      wrap.appendChild(code);
+      wrap.appendChild(input);
+      grid.appendChild(wrap);
+    });
+  }
+  buildParamGrid();
+
+  document.getElementById('applyParamsBtn').addEventListener('click', () => {
+    Object.keys(DEFAULT_PARAMS).forEach(key => {
+      const el = document.getElementById('param_' + key);
+      const v = parseFloat(el.value);
+      if (!isNaN(v)) params[key] = v;
+    });
+    logMsg('パラメータを適用しました');
+  });
+
+  const codeArea = document.getElementById('codeArea');
+  codeArea.value = DEFAULT_CODE;
+
+  function showCodeMsg(msg, isError){
+    const el = document.getElementById('codeMsg');
+    el.textContent = msg;
+    el.className = isError ? 'code-error' : 'code-ok';
+  }
+
+  document.getElementById('applyCodeBtn').addEventListener('click', () => {
+    const res = compileCode(codeArea.value);
+    if (res.ok){
+      showCodeMsg('コンパイルOK。次回スタートから反映されます。', false);
+      logMsg('制御ロジックを更新しました');
+    } else {
+      showCodeMsg('エラー: ' + res.error, true);
+    }
+  });
+
+  document.getElementById('resetCodeBtn').addEventListener('click', () => {
+    codeArea.value = DEFAULT_CODE;
+    compileCode(DEFAULT_CODE);
+    showCodeMsg('デフォルトのコードに戻しました', false);
+  });
+
+
+  // ============================================================
+  // Arduino自動変換 UI
+  // ============================================================
+  const arduinoArea = document.getElementById('arduinoArea');
+  const convertMsg = document.getElementById('convertMsg');
+  arduinoArea.value = ARDUINO_SAMPLE;
+
+  function setConvertMsg(text, cls){
+    convertMsg.textContent = text;
+    convertMsg.className = 'convert-msg ' + (cls || 'info');
+  }
+
+  function applyConvertedParams(converted){
+    Object.keys(converted.params || {}).forEach(key => {
+      if(!Object.prototype.hasOwnProperty.call(DEFAULT_PARAMS,key)) return;
+      params[key] = converted.params[key];
+      const el = document.getElementById('param_' + key);
+      if(el) el.value = params[key];
+    });
+  }
+
+  function convertArduinoNow(){
+    const src = arduinoArea.value.trim();
+    if(!src){
+      setConvertMsg('Arduinoコードを貼り付けてください。','err');
+      return;
+    }
+    try{
+      const converted = buildConvertedCode(src);
+      codeArea.value = converted.code;
+
+      applyConvertedParams(converted);
+      const result = compileCode(converted.code);
+      if(!result.ok){
+        throw new Error('変換後コードの確認に失敗: ' + result.error);
+      }
+
+      if(converted.target){
+        target.x = converted.target.x;
+        target.y = converted.target.y;
+        document.getElementById('targetX').value = converted.target.x;
+        document.getElementById('targetY').value = converted.target.y;
+        fitScaleToTarget();
+      }
+
+      showCodeMsg('自動変換OK。', false);
+      const targetText = converted.target
+        ? ` / loop() の move(${converted.target.x}, ${converted.target.y}) も反映`
+        : '';
+      setConvertMsg('Arduino → シミュレーター変換完了' + targetText,'ok');
+      logMsg('Arduinoコードを自動変換しました');
+    }catch(e){
+      setConvertMsg('変換エラー: ' + e.message,'err');
+      showCodeMsg('変換エラー: ' + e.message, true);
+    }
+  }
+
+  document.getElementById('convertArduinoBtn').addEventListener('click', convertArduinoNow);
+  document.getElementById('loadArduinoBtn').addEventListener('click', () => {
+    arduinoArea.value = ARDUINO_SAMPLE;
+    setConvertMsg('サンプルを読み込みました。','info');
+  });
+
+  document.getElementById('applyTargetBtn').addEventListener('click', () => {
+    const newX = parseFloat(document.getElementById('targetX').value);
+    const newY = parseFloat(document.getElementById('targetY').value);
+
+    target.x = Number.isFinite(newX) ? newX : 0;
+    target.y = Number.isFinite(newY) ? newY : 0;
+
+    // 目標を変更しても、これまでの軌跡は消さない
+    state = freshState();
+    currentRunPath = [];
+    if (path.length === 0) path = [{x:0, y:0}];
+    lastLeft = 0;
+    lastRight = 0;
+    lastAngleErr = 0;
+    lastDistErr = Math.hypot(target.x, target.y);
+    lastStatus = '待機中';
+
+    startBtn.disabled = false;
+    startBtn.textContent = 'スタートスイッチON';
+    stopBtn.textContent = 'ストップ';
+
+    fitScaleToTarget();
+    updateStatus();
+    logMsg('目標座標を X=' + target.x + ' Y=' + target.y + ' に設定。新しい走行としてリセットしました');
+  });
+
+  const startBtn = document.getElementById('startBtn');
+  const stopBtn = document.getElementById('stopBtn');
+  startBtn.addEventListener('click', () => {
+    if (state.started) return;
+    state.started = true;
+    // 新しい走行を開始する前に、前回の表示用軌跡を別セグメントとして確定
+    // これにより前回の到達地点と今回の開始地点（原点）を線で結ばない
+    if (path.length > 1){
+      pastRunPaths.push(path.map(p => ({x:p.x, y:p.y})));
+    }
+    path = [{x: state.pos_x, y: state.pos_y}];
+    // 保存対象はこの新しい走行だけにする。
+    currentRunPath = [{x: state.pos_x, y: state.pos_y}];
+    state.paused = false;
+    state.start_theta = state.theta;
+    startBtn.textContent = 'スタート済み';
+    startBtn.disabled = true;
+    stopBtn.textContent = 'ストップ';
+    logMsg('スタート！ 目標 X=' + target.x + ' Y=' + target.y);
+  });
+
+  stopBtn.addEventListener('click', () => {
+    if (!state.started || state.mission_finished) return;
+    state.paused = !state.paused;
+    if (state.paused) {
+      stopBtn.textContent = '再開';
+      lastStatus = '停止中';
+      logMsg('シミュレーションを停止しました');
+    } else {
+      stopBtn.textContent = 'ストップ';
+      lastStatus = '走行中';
+      logMsg('シミュレーションを再開しました');
+    }
+    updateStatus();
+  });
+
+  document.getElementById('centerTargetBtn').addEventListener('click', () => {
+    fitScaleToTarget();
+    logMsg('原点・目標・現在位置をバランスよく中央に表示しました');
+  });
+
+  document.getElementById('savePathBtn').addEventListener('click', saveCurrentPath);
+  document.getElementById('releasePathBtn').addEventListener('click', releaseSavedPath);
+
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    state = freshState();
+    currentRunPath = [];
+    path = [{x:0,y:0}];
+    pastRunPaths = [];
+    lastLeft = 0; lastRight = 0; lastAngleErr = 0; lastDistErr = 0; lastStatus = '待機中';
+    startBtn.disabled = false;
+    startBtn.textContent = 'スタートスイッチON';
+    stopBtn.textContent = 'ストップ';
+    resetMapView();
+    logMsg('リセットしました');
+  });
+
+  document.getElementById('playbackSpeed').addEventListener('change', (e) => {
+    playbackSpeed = parseFloat(e.target.value);
+  });
+
+  const maxSpeedSlider = document.getElementById('maxSpeedSlider');
+  const maxSpeedVal = document.getElementById('maxSpeedVal');
+  maxSpeedSlider.addEventListener('input', (e) => {
+    engine.maxSpeedMmS = parseFloat(e.target.value);
+    maxSpeedVal.textContent = engine.maxSpeedMmS + ' mm/s';
+  });
+
+  // 初期化
+  try {
+    resizeCanvas();
+    resetMapView();
+    updateSavedPanel();
+    // 起動時からサンプルArduinoコードを自動変換して実際の制御に反映
+    // 毎回「Arduinoコードを自動変換」を押さなくても、このサンプルで動作する。
+    convertArduinoNow();
+    logMsg('シミュレーターを起動しました');
+    requestAnimationFrame(frame);
+  } catch (e) {
+    const msg = document.createElement('div');
+    msg.style.cssText = 'position:fixed;left:16px;right:16px;bottom:16px;padding:14px;background:#3a1717;border:1px solid #ef6b6b;color:#fff;border-radius:8px;font-family:monospace;z-index:9999;white-space:pre-wrap;';
+    msg.textContent = 'シミュレーター起動エラー: ' + e.message;
+    document.body.appendChild(msg);
+    console.error(e);
+  }
+
+})();
+</script>
+</body>
+</html>
