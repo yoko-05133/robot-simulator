@@ -27,10 +27,15 @@ jobs:
         uses: actions/configure-pages@v5
         with:
           enablement: true
+      - name: Prepare exact simulator site
+        run: |
+          set -e
+          mkdir -p _site
+          curl -fsSL https://raw.githubusercontent.com/yoko-05133/robot-simulator/b5780e2227b37a9d289ac589b398530716501765/index.html -o _site/index.html
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: _site
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
